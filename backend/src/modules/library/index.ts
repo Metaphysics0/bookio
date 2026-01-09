@@ -6,9 +6,46 @@ import { AddToLibrarySchema, UpdateProgressSchema } from "./model";
 // For MVP, we'll use a userId from headers or query params
 
 export const libraryModule = new Elysia({ prefix: "/library" })
+	// Get recently played (must be before /:audiobookId to avoid route conflict)
+	.get(
+		"/recent",
+		async ({ headers, query, set }) => {
+			const userId = headers["x-user-id"];
+			if (!userId) {
+				set.status = 401;
+				return { error: "User ID required" };
+			}
+
+			const limit = query.limit ? parseInt(query.limit, 10) : 10;
+			const items = await LibraryService.getRecentlyPlayed(userId, limit);
+			return { items };
+		},
+		{
+			query: t.Object({
+				limit: t.Optional(t.String()),
+			}),
+		},
+	)
+
+	// Get in-progress audiobooks (must be before /:audiobookId to avoid route conflict)
+	.get("/in-progress", async ({ headers, set }) => {
+		const userId = headers["x-user-id"];
+		if (!userId) {
+			set.status = 401;
+			return { error: "User ID required" };
+		}
+
+		const items = await LibraryService.getInProgress(userId);
+		return { items };
+	})
+
 	// Get user's library
-	.get("/:userId", async ({ headers, params }) => {
-		const userId = headers["x-user-id"]!;
+	.get("/", async ({ headers, set }) => {
+		const userId = headers["x-user-id"];
+		if (!userId) {
+			set.status = 401;
+			return { error: "User ID required" };
+		}
 
 		const items = await LibraryService.getUserLibrary(userId);
 		return { items };
@@ -17,10 +54,11 @@ export const libraryModule = new Elysia({ prefix: "/library" })
 	// Get a specific library item
 	.get(
 		"/:audiobookId",
-		async ({ params, headers, error }) => {
+		async ({ params, headers, set }) => {
 			const userId = headers["x-user-id"];
 			if (!userId) {
-				return error(401, { error: "User ID required" });
+				set.status = 401;
+				return { error: "User ID required" };
 			}
 
 			const item = await LibraryService.getLibraryItem(
@@ -28,7 +66,8 @@ export const libraryModule = new Elysia({ prefix: "/library" })
 				params.audiobookId,
 			);
 			if (!item) {
-				return error(404, { error: "Item not in library" });
+				set.status = 404;
+				return { error: "Item not in library" };
 			}
 
 			return item;
@@ -43,10 +82,11 @@ export const libraryModule = new Elysia({ prefix: "/library" })
 	// Add to library
 	.post(
 		"/",
-		async ({ body, headers, error }) => {
+		async ({ body, headers, set }) => {
 			const userId = headers["x-user-id"];
 			if (!userId) {
-				return error(401, { error: "User ID required" });
+				set.status = 401;
+				return { error: "User ID required" };
 			}
 
 			await LibraryService.addToLibrary(userId, body.audiobookId);
@@ -60,10 +100,11 @@ export const libraryModule = new Elysia({ prefix: "/library" })
 	// Update progress
 	.patch(
 		"/:audiobookId/progress",
-		async ({ params, body, headers, error }) => {
+		async ({ params, body, headers, set }) => {
 			const userId = headers["x-user-id"];
 			if (!userId) {
-				return error(401, { error: "User ID required" });
+				set.status = 401;
+				return { error: "User ID required" };
 			}
 
 			await LibraryService.updateProgress(userId, params.audiobookId, body);
@@ -80,10 +121,11 @@ export const libraryModule = new Elysia({ prefix: "/library" })
 	// Remove from library
 	.delete(
 		"/:audiobookId",
-		async ({ params, headers, error }) => {
+		async ({ params, headers, set }) => {
 			const userId = headers["x-user-id"];
 			if (!userId) {
-				return error(401, { error: "User ID required" });
+				set.status = 401;
+				return { error: "User ID required" };
 			}
 
 			await LibraryService.removeFromLibrary(userId, params.audiobookId);
@@ -94,35 +136,4 @@ export const libraryModule = new Elysia({ prefix: "/library" })
 				audiobookId: t.String(),
 			}),
 		},
-	)
-
-	// Get recently played
-	.get(
-		"/recent",
-		async ({ headers, query, error }) => {
-			const userId = headers["x-user-id"];
-			if (!userId) {
-				return error(401, { error: "User ID required" });
-			}
-
-			const limit = query.limit ? parseInt(query.limit, 10) : 10;
-			const items = await LibraryService.getRecentlyPlayed(userId, limit);
-			return { items };
-		},
-		{
-			query: t.Object({
-				limit: t.Optional(t.String()),
-			}),
-		},
-	)
-
-	// Get in-progress audiobooks
-	.get("/in-progress", async ({ headers, error }) => {
-		const userId = headers["x-user-id"];
-		if (!userId) {
-			return error(401, { error: "User ID required" });
-		}
-
-		const items = await LibraryService.getInProgress(userId);
-		return { items };
-	});
+	);

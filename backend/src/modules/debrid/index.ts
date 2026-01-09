@@ -23,7 +23,7 @@ export const debridModule = new Elysia({ prefix: '/debrid' })
   })
 
   // Generate streaming link
-  .post('/link', async ({ body, error }) => {
+  .post('/link', async ({ body, set }) => {
     try {
       const link = await DebridService.generateLink(
         body.infoHash,
@@ -32,15 +32,17 @@ export const debridModule = new Elysia({ prefix: '/debrid' })
       )
 
       if (!link) {
-        return error(404, { error: 'Could not generate link' })
+        set.status = 404
+        return { error: 'Could not generate link' }
       }
 
       return link
     } catch (err) {
-      return error(500, {
+      set.status = 500
+      return {
         error: 'Link generation failed',
         message: err instanceof Error ? err.message : 'Unknown error',
-      })
+      }
     }
   }, {
     body: t.Object({

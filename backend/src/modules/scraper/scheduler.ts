@@ -49,7 +49,7 @@ export function stopScraperScheduler(): void {
 }
 
 export function isSchedulerRunning(): boolean {
-  return schedulerJob !== null && schedulerJob.running
+  return schedulerJob !== null
 }
 
 export function getNextScheduledRun(): Date | null {

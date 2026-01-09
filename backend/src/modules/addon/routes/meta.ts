@@ -2,29 +2,33 @@ import { Elysia, t } from 'elysia'
 import { AddonService } from '../service'
 
 export const metaRoute = new Elysia()
-  .get('/:addonId/meta/:type/:id', ({ params, error }) => {
+  .get('/:addonId/meta/:type/:id', ({ params, set }) => {
     // Handle .json extension
     const id = params.id.replace(/\.json$/, '')
     const manifest = AddonService.getManifest(params.addonId)
 
     if (!manifest) {
-      return error(404, { error: 'Addon not found' })
+      set.status = 404
+      return { error: 'Addon not found' }
     }
 
     // Check if addon supports meta resource
     if (!manifest.resources.includes('meta')) {
-      return error(404, { error: 'Addon does not support meta resource' })
+      set.status = 404
+      return { error: 'Addon does not support meta resource' }
     }
 
     // Check if addon supports this type
     if (!manifest.types.includes(params.type)) {
-      return error(404, { error: 'Addon does not support this content type' })
+      set.status = 404
+      return { error: 'Addon does not support this content type' }
     }
 
     const meta = AddonService.getMeta(params.addonId, params.type, id)
 
     if (!meta) {
-      return error(404, { error: 'Audiobook not found' })
+      set.status = 404
+      return { error: 'Audiobook not found' }
     }
 
     return { meta }

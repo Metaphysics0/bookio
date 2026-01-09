@@ -2,13 +2,14 @@ import { Elysia, t } from 'elysia'
 import { AddonService } from '../service'
 
 export const catalogRoute = new Elysia()
-  .get('/:addonId/catalog/:type/:catalogId', ({ params, query, error }) => {
+  .get('/:addonId/catalog/:type/:catalogId', ({ params, query, set }) => {
     // Handle .json extension
     const catalogId = params.catalogId.replace(/\.json$/, '')
     const manifest = AddonService.getManifest(params.addonId)
 
     if (!manifest) {
-      return error(404, { error: 'Addon not found' })
+      set.status = 404
+      return { error: 'Addon not found' }
     }
 
     // Check if catalog exists in manifest
@@ -17,7 +18,8 @@ export const catalogRoute = new Elysia()
     )
 
     if (!catalogDef) {
-      return error(404, { error: 'Catalog not found' })
+      set.status = 404
+      return { error: 'Catalog not found' }
     }
 
     const metas = AddonService.getCatalog(
