@@ -1,16 +1,18 @@
 {
-	"name": "bookio",
+	"name": "bookio-monorepo",
+	"author": "Ryan Roberts",
+	"license": "MIT",
 	"version": "1.0.0",
-	"description": "",
-	"main": "index.js",
+	"private": true,
 	"scripts": {
 		"test": "echo \"Error: no test specified\" && exit 1",
 		"lint": "tsgo -p backend/tsconfig.json --noEmit"
 	},
-	"keywords": [],
-	"author": "",
-	"license": "ISC",
-	"type": "commonjs",
+	"workspaces": {
+		"packages": [
+			"backend"
+		]
+	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.11"
 	},
