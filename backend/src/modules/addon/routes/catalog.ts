@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 import { AddonService } from '../service'
 
 export const catalogRoute = new Elysia()
-  .get('/:addonId/catalog/:type/:catalogId', ({ params, query, set }) => {
+  .get('/:addonId/catalog/:type/:catalogId', async ({ params, query, set }) => {
     // Handle .json extension
     const catalogId = params.catalogId.replace(/\.json$/, '')
     const manifest = AddonService.getManifest(params.addonId)
@@ -22,7 +22,7 @@ export const catalogRoute = new Elysia()
       return { error: 'Catalog not found' }
     }
 
-    const metas = AddonService.getCatalog(
+    const metas = await AddonService.getCatalog(
       params.addonId,
       params.type,
       catalogId,

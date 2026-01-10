@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 import { AddonService } from '../service'
 
 export const streamRoute = new Elysia()
-  .get('/:addonId/stream/:type/:id', ({ params, set }) => {
+  .get('/:addonId/stream/:type/:id', async ({ params, set }) => {
     // Handle .json extension
     const id = params.id.replace(/\.json$/, '')
     const manifest = AddonService.getManifest(params.addonId)
@@ -24,7 +24,7 @@ export const streamRoute = new Elysia()
       return { error: 'Addon does not support this content type' }
     }
 
-    const streams = AddonService.getStreams(params.addonId, params.type, id)
+    const streams = await AddonService.getStreams(params.addonId, params.type, id)
 
     return { streams }
   }, {

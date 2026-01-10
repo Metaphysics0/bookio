@@ -19,6 +19,19 @@ interface ArchiveResponse {
   }
 }
 
+interface ArchiveMetadata {
+  files: {
+    name: string
+    format: string
+    size: string
+    length?: string
+  }[]
+  metadata: {
+    title: string
+    creator?: string | string[]
+  }
+}
+
 export const archiveOrgSource: ScraperSource = {
   id: 'archive-org',
   name: 'Internet Archive',
@@ -44,22 +57,85 @@ export const archiveOrgSource: ScraperSource = {
       for (const item of data.response?.docs || []) {
         if (!item.identifier) continue
 
+        // Fetch metadata to get actual audio files
+        let streamUrl = ''
+        let totalSize = item.item_size || 0
+        let format: 'mp3' | 'm4b' | 'flac' | 'unknown' = 'mp3'
+
+        try {
+          const metaResponse = await fetch(
+            `https://archive.org/metadata/${item.identifier}`
+          )
+
+          if (metaResponse.ok) {
+            const metadata = (await metaResponse.json()) as ArchiveMetadata
+
+            // Find audio files
+            const audioFiles = metadata.files.filter(
+              (f) =>
+                f.format === 'VBR MP3' ||
+                f.format === '64Kbps MP3' ||
+                f.format === '128Kbps MP3' ||
+                f.name.endsWith('.mp3') ||
+                f.name.endsWith('.m4b') ||
+                f.name.endsWith('.flac')
+            )
+
+            if (audioFiles.length > 0) {
+              // Calculate total size
+              totalSize = audioFiles.reduce((sum, f) => sum + (parseInt(f.size) || 0), 0)
+
+              // Prefer m4b (single file with chapters), then first mp3
+              const m4bFile = audioFiles.find((f) => f.name.endsWith('.m4b'))
+              const flacFile = audioFiles.find((f) => f.name.endsWith('.flac'))
+
+              if (m4bFile) {
+                streamUrl = `https://archive.org/download/${item.identifier}/${encodeURIComponent(m4bFile.name)}`
+                format = 'm4b'
+              } else if (flacFile) {
+                streamUrl = `https://archive.org/download/${item.identifier}/${encodeURIComponent(flacFile.name)}`
+                format = 'flac'
+              } else {
+                // For multi-file audiobooks, provide the download page or first file
+                const firstMp3 = audioFiles.find((f) => f.name.endsWith('.mp3'))
+                if (firstMp3) {
+                  streamUrl = `https://archive.org/download/${item.identifier}/${encodeURIComponent(firstMp3.name)}`
+                } else {
+                  // Fallback to compressed download
+                  streamUrl = `https://archive.org/compress/${item.identifier}/formats=VBR%20MP3&file=/${item.identifier}.zip`
+                }
+                format = 'mp3'
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch metadata for ${item.identifier}:`, err)
+        }
+
+        // Fallback to download page if no stream URL
+        if (!streamUrl) {
+          streamUrl = `https://archive.org/download/${item.identifier}`
+        }
+
         // Parse the title for additional metadata
         const parsed = parseTorrentName(item.title || item.identifier)
 
         const torrent: AudiobookTorrent = {
-          infoHash: `archive:${item.identifier}`, // Placeholder - actual hash from torrent file
+          infoHash: streamUrl, // Use URL as "infoHash" - stream handler recognizes HTTP URLs
           title: item.title || item.identifier,
           author: item.creator || parsed.author || 'Unknown',
-          format: parsed.format,
-          size: item.item_size || 0,
-          seeders: 0, // Archive.org uses web seeding
+          format: parsed.format !== 'unknown' ? parsed.format : format,
+          size: totalSize,
+          seeders: 999, // Archive.org is always available
           source: 'archive-org',
           audiobookId: `ab:archive:${item.identifier}`,
           scrapedAt: new Date(),
         }
 
         torrents.push(torrent)
+
+        // Add small delay to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 100))
       }
     } catch (error) {
       console.error('Archive.org scraper error:', error)

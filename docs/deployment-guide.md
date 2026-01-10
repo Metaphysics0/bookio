@@ -218,67 +218,6 @@ This guide walks you through deploying the Bookio backend to production with all
     # Opens https://bookio-api.fly.dev
     ```
 
-## Step 4b: Deploy to Railway (Alternative)
-
-1. Install Railway CLI:
-   ```bash
-   # macOS
-   brew install railway
-
-   # Or npm
-   npm install -g @railway/cli
-   ```
-
-2. Login to Railway:
-   ```bash
-   railway login
-   ```
-
-3. Create a new project:
-   ```bash
-   cd backend
-   railway init
-   ```
-
-4. Add a `railway.json` (optional, for configuration):
-   ```json
-   {
-     "$schema": "https://railway.app/railway.schema.json",
-     "build": {
-       "builder": "DOCKERFILE",
-       "dockerfilePath": "Dockerfile"
-     },
-     "deploy": {
-       "startCommand": "bun run dist/index.js",
-       "restartPolicyType": "ON_FAILURE"
-     }
-   }
-   ```
-
-5. Set environment variables:
-   ```bash
-   # Option A: Set via CLI
-   railway variables set MONGO_URI="mongodb+srv://..."
-   railway variables set MONGO_DATABASE="bookio"
-   railway variables set REDIS_URL="rediss://..."
-   railway variables set NODE_ENV="production"
-   railway variables set PORT="3000"
-
-   # Option B: Use Doppler integration in Railway dashboard
-   # Go to your project → Variables → Add from Doppler
-   ```
-
-6. Deploy:
-   ```bash
-   railway up
-   ```
-
-7. Get your domain:
-   ```bash
-   railway domain
-   # Or set a custom domain in the dashboard
-   ```
-
 ## Step 5: Verify Deployment
 
 1. Test the health endpoint:

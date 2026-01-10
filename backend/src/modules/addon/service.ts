@@ -1,11 +1,14 @@
 import type { Manifest, CatalogItem, Meta, Stream } from './model'
+import { TorrentCollection, type TorrentDocument } from '../../db/collections/torrents'
+import { MetadataService } from '../metadata/service'
+import { isMongoConnected } from '../../db/mongo'
 
 // Built-in community addon manifest
 const communityManifest: Manifest = {
   id: 'org.bookio.community',
   version: '1.0.0',
   name: 'Community Audiobooks',
-  description: 'Community-sourced audiobooks from various torrent sources',
+  description: 'Community-sourced audiobooks from LibriVox and Internet Archive',
   resources: ['catalog', 'meta', 'stream'],
   types: ['audiobook'],
   catalogs: [
@@ -23,154 +26,22 @@ const communityManifest: Manifest = {
       id: 'recent',
       name: 'Recently Added',
     },
+    {
+      type: 'audiobook',
+      id: 'librivox',
+      name: 'LibriVox Public Domain',
+    },
+    {
+      type: 'audiobook',
+      id: 'archive',
+      name: 'Internet Archive',
+    },
   ],
   idPrefixes: ['ab:'],
   behaviorHints: {
     configurable: true,
     p2p: true,
   },
-}
-
-// Sample audiobook data for testing
-const sampleAudiobooks: CatalogItem[] = [
-  {
-    id: 'ab:1',
-    type: 'audiobook',
-    name: 'Project Hail Mary',
-    poster: 'https://m.media-amazon.com/images/I/91vS2L5YfEL._SL1500_.jpg',
-    narrator: 'Ray Porter',
-    author: 'Andy Weir',
-    duration: '16:10:35',
-    releaseInfo: '2021',
-    genres: ['Science Fiction', 'Adventure'],
-    description: 'Ryland Grace is the sole survivor on a desperate, last-chance mission.',
-  },
-  {
-    id: 'ab:2',
-    type: 'audiobook',
-    name: 'The Martian',
-    poster: 'https://m.media-amazon.com/images/I/81wFMY9OAFL._SL1500_.jpg',
-    narrator: 'Wil Wheaton',
-    author: 'Andy Weir',
-    duration: '10:53:00',
-    releaseInfo: '2014',
-    genres: ['Science Fiction', 'Thriller'],
-    description: 'Six days ago, astronaut Mark Watney became one of the first people to walk on Mars.',
-  },
-  {
-    id: 'ab:3',
-    type: 'audiobook',
-    name: 'Dune',
-    poster: 'https://m.media-amazon.com/images/I/81ym3QUd3KL._SL1500_.jpg',
-    narrator: 'Scott Brick',
-    author: 'Frank Herbert',
-    duration: '21:02:00',
-    releaseInfo: '1965',
-    genres: ['Science Fiction', 'Fantasy'],
-    description: 'Set on the desert planet Arrakis, Dune is the story of the boy Paul Atreides.',
-  },
-]
-
-// Full metadata for sample audiobooks
-const sampleMetas: Record<string, Meta> = {
-  'ab:1': {
-    id: 'ab:1',
-    type: 'audiobook',
-    name: 'Project Hail Mary',
-    description: 'Ryland Grace is the sole survivor on a desperate, last-chance mission—and if he fails, humanity and the Earth itself will perish. Except that right now, he doesn\'t know that. He can\'t even remember his own name, let alone the nature of his assignment or how to complete it.',
-    poster: 'https://m.media-amazon.com/images/I/91vS2L5YfEL._SL1500_.jpg',
-    runtime: '16:10:35',
-    chapters: [
-      { id: 'ab:1:1', title: 'Chapter 1', duration: '45:20', startTime: 0 },
-      { id: 'ab:1:2', title: 'Chapter 2', duration: '38:15', startTime: 2720 },
-      { id: 'ab:1:3', title: 'Chapter 3', duration: '42:30', startTime: 5015 },
-      { id: 'ab:1:4', title: 'Chapter 4', duration: '35:45', startTime: 7565 },
-      { id: 'ab:1:5', title: 'Chapter 5', duration: '48:10', startTime: 9710 },
-    ],
-    narrator: ['Ray Porter'],
-    author: ['Andy Weir'],
-    publisher: 'Audible Studios',
-    releaseInfo: '2021',
-    genres: ['Science Fiction', 'Adventure'],
-  },
-  'ab:2': {
-    id: 'ab:2',
-    type: 'audiobook',
-    name: 'The Martian',
-    description: 'Six days ago, astronaut Mark Watney became one of the first people to walk on Mars. Now, he\'s sure he\'ll be the first person to die there.',
-    poster: 'https://m.media-amazon.com/images/I/81wFMY9OAFL._SL1500_.jpg',
-    runtime: '10:53:00',
-    chapters: [
-      { id: 'ab:2:1', title: 'Sol 6', duration: '32:15', startTime: 0 },
-      { id: 'ab:2:2', title: 'Sol 7', duration: '28:40', startTime: 1935 },
-      { id: 'ab:2:3', title: 'Sol 14', duration: '35:20', startTime: 3655 },
-    ],
-    narrator: ['Wil Wheaton'],
-    author: ['Andy Weir'],
-    publisher: 'Podium Audio',
-    releaseInfo: '2014',
-    genres: ['Science Fiction', 'Thriller'],
-  },
-  'ab:3': {
-    id: 'ab:3',
-    type: 'audiobook',
-    name: 'Dune',
-    description: 'Set on the desert planet Arrakis, Dune is the story of the boy Paul Atreides, heir to a noble family tasked with ruling an inhospitable world where the only thing of value is the "spice" melange.',
-    poster: 'https://m.media-amazon.com/images/I/81ym3QUd3KL._SL1500_.jpg',
-    runtime: '21:02:00',
-    chapters: [
-      { id: 'ab:3:1', title: 'Book One: Dune', duration: '7:30:00', startTime: 0 },
-      { id: 'ab:3:2', title: 'Book Two: Muad\'Dib', duration: '7:00:00', startTime: 27000 },
-      { id: 'ab:3:3', title: 'Book Three: The Prophet', duration: '6:32:00', startTime: 52200 },
-    ],
-    narrator: ['Scott Brick'],
-    author: ['Frank Herbert'],
-    publisher: 'Macmillan Audio',
-    releaseInfo: '1965',
-    genres: ['Science Fiction', 'Fantasy'],
-  },
-}
-
-// Sample streams for testing
-const sampleStreams: Record<string, Stream[]> = {
-  'ab:1': [
-    {
-      name: 'Community\n320kbps MP3',
-      title: 'Project.Hail.Mary.2021.Audiobook.MP3\n580 MB | 42 seeders | LibriVox',
-      infoHash: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2',
-      fileIdx: 0,
-      behaviorHints: {
-        bingeGroup: 'community-320k',
-        filename: 'chapter01.mp3',
-      },
-    },
-    {
-      name: 'Community\nFLAC Lossless',
-      title: 'Project.Hail.Mary.2021.FLAC\n2.1 GB | 15 seeders',
-      infoHash: 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3',
-      fileIdx: 0,
-      behaviorHints: {
-        bingeGroup: 'community-flac',
-        filename: 'chapter01.flac',
-      },
-    },
-  ],
-  'ab:2': [
-    {
-      name: 'Community\n256kbps MP3',
-      title: 'The.Martian.2014.Audiobook\n450 MB | 28 seeders',
-      infoHash: 'c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
-      fileIdx: 0,
-    },
-  ],
-  'ab:3': [
-    {
-      name: 'Community\n320kbps MP3',
-      title: 'Dune.1965.Unabridged\n890 MB | 67 seeders',
-      infoHash: 'd4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5',
-      fileIdx: 0,
-    },
-  ],
 }
 
 // Addon registry - maps addon IDs to manifests
@@ -191,45 +62,381 @@ export abstract class AddonService {
     addonRegistry.set(manifest.id, manifest)
   }
 
-  static getCatalog(
+  /**
+   * Get catalog items from MongoDB or Open Library
+   */
+  static async getCatalog(
     addonId: string,
     type: string,
     catalogId: string,
     extra?: { search?: string; genre?: string; skip?: number }
-  ): CatalogItem[] {
-    // For now, return sample data
-    // In production, this would query MongoDB
-    let items = [...sampleAudiobooks]
-
-    if (extra?.search) {
-      const searchLower = extra.search.toLowerCase()
-      items = items.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchLower) ||
-          item.author?.toLowerCase().includes(searchLower) ||
-          item.narrator?.toLowerCase().includes(searchLower)
-      )
-    }
-
-    if (extra?.genre) {
-      items = items.filter((item) =>
-        item.genres?.some((g) => g.toLowerCase() === extra.genre?.toLowerCase())
-      )
-    }
-
+  ): Promise<CatalogItem[]> {
     const skip = extra?.skip ?? 0
-    return items.slice(skip, skip + 20)
+    const limit = 20
+
+    // If there's a search query, search both MongoDB (scraped) and Open Library
+    if (extra?.search) {
+      return this.searchCatalog(extra.search, skip, limit)
+    }
+
+    // For specific catalog IDs, filter by source
+    if (catalogId === 'librivox') {
+      return this.getCatalogBySource('librivox', skip, limit)
+    }
+
+    if (catalogId === 'archive') {
+      return this.getCatalogBySource('archive-org', skip, limit)
+    }
+
+    // For 'recent' catalog, get recently scraped torrents
+    if (catalogId === 'recent') {
+      return this.getRecentCatalog(skip, limit)
+    }
+
+    // Default 'popular' catalog - mix of sources
+    return this.getPopularCatalog(skip, limit)
   }
 
-  static getMeta(addonId: string, type: string, id: string): Meta | null {
-    // For now, return sample data
-    // In production, this would query MongoDB
-    return sampleMetas[id] ?? null
+  /**
+   * Search for audiobooks across MongoDB and Open Library
+   */
+  private static async searchCatalog(
+    query: string,
+    skip: number,
+    limit: number
+  ): Promise<CatalogItem[]> {
+    // Search MongoDB for scraped content (if connected)
+    let torrents: TorrentDocument[] = []
+    if (isMongoConnected()) {
+      try {
+        torrents = await TorrentCollection.search(query, limit)
+      } catch (err) {
+        console.warn('MongoDB search failed:', err)
+      }
+    }
+
+    // Also search Open Library for metadata (to enrich results)
+    const olResults = await MetadataService.searchBooks(query, limit)
+
+    // Convert torrents to catalog items
+    const items: CatalogItem[] = torrents.map((t) => this.torrentToCatalogItem(t))
+
+    // If we don't have enough results from torrents, add Open Library results
+    if (items.length < limit && olResults.length > 0) {
+      for (const book of olResults) {
+        // Skip if we already have this title
+        if (items.some((i) =>
+          i.name.toLowerCase() === book.title.toLowerCase()
+        )) {
+          continue
+        }
+
+        items.push({
+          id: book.id,
+          type: 'audiobook',
+          name: book.title,
+          poster: book.cover,
+          author: book.author.join(', '),
+          releaseInfo: book.publishYear?.toString(),
+          genres: book.subjects?.slice(0, 3),
+          description: book.description?.slice(0, 200),
+        })
+
+        if (items.length >= limit) break
+      }
+    }
+
+    return items.slice(skip, skip + limit)
   }
 
-  static getStreams(addonId: string, type: string, id: string): Stream[] {
-    // For now, return sample data
-    // In production, this would query MongoDB for scraped torrents
-    return sampleStreams[id] ?? []
+  /**
+   * Get catalog items from a specific source
+   */
+  private static async getCatalogBySource(
+    source: string,
+    skip: number,
+    limit: number
+  ): Promise<CatalogItem[]> {
+    if (!isMongoConnected()) {
+      // Fall back to Open Library search for the source
+      const query = source === 'librivox' ? 'librivox audiobook' : 'public domain audiobook'
+      const books = await MetadataService.searchBooks(query, skip + limit)
+      return books.slice(skip, skip + limit).map((book) => ({
+        id: book.id,
+        type: 'audiobook',
+        name: book.title,
+        poster: book.cover,
+        author: book.author.join(', '),
+        releaseInfo: book.publishYear?.toString(),
+        genres: book.subjects?.slice(0, 3),
+      }))
+    }
+
+    const torrents = await TorrentCollection.getRecentlyScraped(source, skip + limit)
+    return torrents.slice(skip, skip + limit).map((t) => this.torrentToCatalogItem(t))
+  }
+
+  /**
+   * Get recently scraped audiobooks
+   */
+  private static async getRecentCatalog(
+    skip: number,
+    limit: number
+  ): Promise<CatalogItem[]> {
+    if (!isMongoConnected()) {
+      // Fall back to Open Library
+      const books = await MetadataService.searchBooks('new audiobook fiction', skip + limit)
+      return books.slice(skip, skip + limit).map((book) => ({
+        id: book.id,
+        type: 'audiobook',
+        name: book.title,
+        poster: book.cover,
+        author: book.author.join(', '),
+        releaseInfo: book.publishYear?.toString(),
+        genres: book.subjects?.slice(0, 3),
+      }))
+    }
+
+    // Get from both sources
+    const [librivox, archive] = await Promise.all([
+      TorrentCollection.getRecentlyScraped('librivox', (skip + limit) / 2),
+      TorrentCollection.getRecentlyScraped('archive-org', (skip + limit) / 2),
+    ])
+
+    // Merge and sort by scraped date
+    const all = [...librivox, ...archive].sort(
+      (a, b) => new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime()
+    )
+
+    return all.slice(skip, skip + limit).map((t) => this.torrentToCatalogItem(t))
+  }
+
+  /**
+   * Get popular audiobooks (most seeders or just a mix)
+   */
+  private static async getPopularCatalog(
+    skip: number,
+    limit: number
+  ): Promise<CatalogItem[]> {
+    let all: TorrentDocument[] = []
+
+    if (isMongoConnected()) {
+      try {
+        // Get from both sources
+        const [librivox, archive] = await Promise.all([
+          TorrentCollection.getRecentlyScraped('librivox', 50),
+          TorrentCollection.getRecentlyScraped('archive-org', 50),
+        ])
+        all = [...librivox, ...archive]
+      } catch (err) {
+        console.warn('MongoDB query failed:', err)
+      }
+    }
+
+    // If no scraped content, fall back to Open Library search for popular books
+    if (all.length === 0) {
+      const popularBooks = await MetadataService.searchBooks('audiobook fiction', limit * 2)
+      return popularBooks.slice(skip, skip + limit).map((book) => ({
+        id: book.id,
+        type: 'audiobook',
+        name: book.title,
+        poster: book.cover,
+        author: book.author.join(', '),
+        releaseInfo: book.publishYear?.toString(),
+        genres: book.subjects?.slice(0, 3),
+        description: book.description?.slice(0, 200),
+      }))
+    }
+
+    return all.slice(skip, skip + limit).map((t) => this.torrentToCatalogItem(t))
+  }
+
+  /**
+   * Get full metadata for an audiobook
+   */
+  static async getMeta(addonId: string, type: string, id: string): Promise<Meta | null> {
+    // If it's an Open Library ID (ol:XXXXX), fetch from Open Library
+    if (id.startsWith('ol:')) {
+      const workId = id.replace('ol:', '')
+      const book = await MetadataService.getWorkById(workId)
+
+      if (!book) return null
+
+      // Check if we have any streams for this book
+      const torrents = await this.findTorrentsForBook(book.title, book.author[0])
+
+      return {
+        id,
+        type: 'audiobook',
+        name: book.title,
+        description: book.description,
+        poster: book.cover,
+        author: book.author,
+        releaseInfo: book.publishYear?.toString(),
+        genres: book.subjects,
+        // If we found matching torrents, we have streams available
+        links: torrents.length > 0
+          ? [{ name: `${torrents.length} streams available`, category: 'streams', url: '#' }]
+          : undefined,
+      }
+    }
+
+    // For scraped content IDs (ab:librivox:XXX or ab:archive:XXX)
+    const torrent = await this.findTorrentById(id)
+
+    if (torrent) {
+      // Try to enrich with Open Library metadata
+      const olMeta = await MetadataService.matchBook(torrent.title, torrent.author)
+
+      return {
+        id,
+        type: 'audiobook',
+        name: torrent.title,
+        description: olMeta?.description,
+        poster: olMeta?.cover,
+        author: [torrent.author],
+        narrator: torrent.narrator ? [torrent.narrator] : undefined,
+        genres: olMeta?.subjects,
+        releaseInfo: olMeta?.publishYear?.toString(),
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Get available streams for an audiobook
+   */
+  static async getStreams(addonId: string, type: string, id: string): Promise<Stream[]> {
+    // If it's an Open Library ID, find matching torrents by title/author
+    if (id.startsWith('ol:')) {
+      const workId = id.replace('ol:', '')
+      const book = await MetadataService.getWorkById(workId)
+
+      if (!book) return []
+
+      const torrents = await this.findTorrentsForBook(book.title, book.author[0])
+      return torrents.map((t) => this.torrentToStream(t))
+    }
+
+    // For scraped content IDs, get directly
+    const torrent = await this.findTorrentById(id)
+
+    if (torrent) {
+      return [this.torrentToStream(torrent)]
+    }
+
+    // Also try to find by audiobookId
+    if (isMongoConnected()) {
+      try {
+        const torrents = await TorrentCollection.findByAudiobookId(id)
+        return torrents.map((t) => this.torrentToStream(t))
+      } catch (err) {
+        console.warn('MongoDB query failed:', err)
+      }
+    }
+
+    return []
+  }
+
+  /**
+   * Find torrents that match a book title and author
+   */
+  private static async findTorrentsForBook(
+    title: string,
+    author?: string
+  ): Promise<TorrentDocument[]> {
+    if (!isMongoConnected()) return []
+
+    try {
+      const query = author ? `${title} ${author}` : title
+      return TorrentCollection.search(query, 10)
+    } catch (err) {
+      console.warn('MongoDB search failed:', err)
+      return []
+    }
+  }
+
+  /**
+   * Find a torrent by its audiobook ID
+   */
+  private static async findTorrentById(id: string): Promise<TorrentDocument | null> {
+    if (!isMongoConnected()) return null
+
+    try {
+      // The ID format is like "ab:librivox:12345" or "ab:archive:identifier"
+      const match = id.match(/^ab:(librivox|archive):(.+)$/)
+
+      if (match) {
+        const source = match[1] === 'archive' ? 'archive-org' : match[1]
+        const identifier = match[2]
+        const infoHash = `${source === 'archive-org' ? 'archive' : source}:${identifier}`
+        return TorrentCollection.findByInfoHash(infoHash)
+      }
+
+      // Try searching by audiobookId
+      const results = await TorrentCollection.findByAudiobookId(id)
+      return results[0] ?? null
+    } catch (err) {
+      console.warn('MongoDB query failed:', err)
+      return null
+    }
+  }
+
+  /**
+   * Convert a torrent document to a catalog item
+   */
+  private static torrentToCatalogItem(torrent: TorrentDocument): CatalogItem {
+    return {
+      id: torrent.audiobookId || `ab:${torrent.source}:${torrent.infoHash.split(':')[1] || torrent.infoHash}`,
+      type: 'audiobook',
+      name: torrent.title,
+      author: torrent.author,
+      narrator: torrent.narrator,
+      description: `${torrent.format.toUpperCase()} | ${this.formatSize(torrent.size)}`,
+    }
+  }
+
+  /**
+   * Convert a torrent document to a stream
+   */
+  private static torrentToStream(torrent: TorrentDocument): Stream {
+    const isDirectUrl = torrent.infoHash.startsWith('http')
+    const isLibrivox = torrent.source === 'librivox'
+    const isArchive = torrent.source === 'archive-org'
+
+    // For LibriVox and Archive.org, we have direct URLs
+    if (isDirectUrl) {
+      return {
+        name: `${torrent.source === 'librivox' ? 'LibriVox' : 'Archive.org'}\n${torrent.format.toUpperCase()}`,
+        title: `${torrent.title}\n${this.formatSize(torrent.size)} | Direct Stream`,
+        url: torrent.infoHash,
+        behaviorHints: {
+          filename: `${torrent.title}.${torrent.format}`,
+        },
+      }
+    }
+
+    // For actual torrents (future)
+    return {
+      name: `${isLibrivox ? 'LibriVox' : isArchive ? 'Archive.org' : 'Community'}\n${torrent.format.toUpperCase()}`,
+      title: `${torrent.title}\n${this.formatSize(torrent.size)} | ${torrent.seeders} seeders`,
+      infoHash: torrent.infoHash,
+      fileIdx: 0,
+      behaviorHints: {
+        bingeGroup: `${torrent.source}-${torrent.format}`,
+        filename: `${torrent.title}.${torrent.format}`,
+      },
+    }
+  }
+
+  /**
+   * Format file size for display
+   */
+  private static formatSize(bytes: number): string {
+    if (bytes === 0) return 'Unknown size'
+    const units = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(1024))
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
   }
 }

@@ -1,4 +1,4 @@
-FROM oven/bun:1 as base
+FROM oven/bun:1.3.5 as base
 WORKDIR /app
 
 # Install dependencies

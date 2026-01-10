@@ -22,6 +22,10 @@ export function getDb(): Db {
 	return db;
 }
 
+export function isMongoConnected(): boolean {
+	return db !== null;
+}
+
 export async function disconnectMongo(): Promise<void> {
 	if (client) {
 		await client.close();

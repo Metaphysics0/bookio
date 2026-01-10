@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 import { AddonService } from '../service'
 
 export const metaRoute = new Elysia()
-  .get('/:addonId/meta/:type/:id', ({ params, set }) => {
+  .get('/:addonId/meta/:type/:id', async ({ params, set }) => {
     // Handle .json extension
     const id = params.id.replace(/\.json$/, '')
     const manifest = AddonService.getManifest(params.addonId)
@@ -24,7 +24,7 @@ export const metaRoute = new Elysia()
       return { error: 'Addon does not support this content type' }
     }
 
-    const meta = AddonService.getMeta(params.addonId, params.type, id)
+    const meta = await AddonService.getMeta(params.addonId, params.type, id)
 
     if (!meta) {
       set.status = 404

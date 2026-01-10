@@ -4,6 +4,7 @@ import { addonModule } from './modules/addon'
 import { scraperModule } from './modules/scraper'
 import { libraryModule } from './modules/library'
 import { debridModule } from './modules/debrid'
+import { metadataRoutes } from './modules/metadata'
 
 export const app = new Elysia()
   .use(cors())
@@ -11,6 +12,7 @@ export const app = new Elysia()
   .use(scraperModule)
   .use(libraryModule)
   .use(debridModule)
+  .use(metadataRoutes)
   .get('/health', () => ({ status: 'ok', timestamp: new Date().toISOString() }))
   .get('/', () => ({
     name: 'Bookio API',
@@ -39,6 +41,11 @@ export const app = new Elysia()
         providers: '/debrid/providers',
         cache: '/debrid/cache',
         link: '/debrid/link',
+      },
+      metadata: {
+        search: '/metadata/search?q=<query>',
+        work: '/metadata/work/:workId',
+        match: '/metadata/match?title=<title>&author=<author>',
       },
     },
   }))
